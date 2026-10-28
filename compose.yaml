@@ -38,6 +38,22 @@ services:
   counting-house:
     <<: *demo
     entrypoint: [deoos-demo, counting-house]
+  nightly-batch-resume:
+    <<: *demo
+    entrypoint: [deoos-demo, nightly-batch-resume]
+  agent-run-resume:
+    <<: *demo
+    entrypoint: [deoos-demo, agent-run-resume]
+  worker-amd64:
+    <<: *demo
+    platform: linux/amd64
+    image: deoos-examples:amd64
+    entrypoint: [deoos-demo, multi-arch-handoff]
+  worker-arm64:
+    <<: *demo
+    platform: linux/arm64
+    image: deoos-examples:arm64
+    entrypoint: [deoos-demo, multi-arch-handoff]
 
 volumes:
   rustfs-data:

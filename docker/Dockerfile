@@ -11,21 +11,35 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 # Keep this pin identical to deoos.lock.
 ARG DEOOS_VERSION=0.7.2
 ARG TARGETARCH
+# Set to a filename in docker/offline-tarballs/ to build without downloading deoos.
+# Leave it empty and the build uses that directory's matching archive when present.
+ARG DEOOS_TARBALL=
+
+COPY docker/offline-tarballs/ /tmp/offline-tarballs/
 
 RUN set -eu; \
-    case "$TARGETARCH" in amd64) target=x64 ;; arm64) target=arm64 ;; *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; esac; \
+    arch=${TARGETARCH:-$(dpkg --print-architecture)}; \
+    case "$arch" in amd64) target=x64 ;; arm64) target=arm64 ;; *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; esac; \
     archive="deoos-${DEOOS_VERSION}-linux-${target}.tar.gz"; \
-    base="https://github.com/deoos-dev/deoos/releases/download/${DEOOS_VERSION}"; \
     mkdir -p /tmp/release /opt/deoos /app; \
+    if [ -n "$DEOOS_TARBALL" ]; then \
+      cp "/tmp/offline-tarballs/$DEOOS_TARBALL" "/tmp/release/$archive"; \
+      cp /tmp/offline-tarballs/SHA256SUMS /tmp/release/SHA256SUMS; \
+    elif [ -f "/tmp/offline-tarballs/$archive" ]; then \
+      cp "/tmp/offline-tarballs/$archive" "/tmp/release/$archive"; \
+      cp /tmp/offline-tarballs/SHA256SUMS /tmp/release/SHA256SUMS; \
+    else \
+      base="https://github.com/deoos-dev/deoos/releases/download/${DEOOS_VERSION}"; \
+      curl -fL --retry 3 "${base}/${archive}" -o "/tmp/release/$archive"; \
+      curl -fsSL --retry 3 "${base}/SHA256SUMS" -o /tmp/release/SHA256SUMS; \
+    fi; \
     cd /tmp/release; \
-    curl -fL --retry 3 "${base}/${archive}" -o "$archive"; \
-    curl -fsSL --retry 3 "${base}/SHA256SUMS" -o SHA256SUMS; \
     awk -v name="$archive" '$2 == name { print; found++ } END { if (found != 1) exit 1 }' SHA256SUMS > selected.sha256; \
     sha256sum -c selected.sha256; \
     tar -xzf "$archive" --strip-components=1 -C /opt/deoos; \
     python -m pip install --no-cache-dir /opt/deoos/python/*.whl duckdb==1.5.6 boto3==1.42.97; \
     cd /app; \
-    npm install --no-audit --no-fund /opt/deoos/node/*.tgz @duckdb/node-api@1.5.6-r.1; \
+    npm install --no-audit --no-fund /opt/deoos/node/*.tgz @duckdb/node-api@1.5.6-r.1 @aws-sdk/client-s3@3.1158.0; \
     rm -rf /tmp/release
 
 COPY python /app/python
