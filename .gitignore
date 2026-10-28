@@ -2,6 +2,8 @@
 .venv/
 node_modules/
 outputs/
+docker/offline-tarballs/*.tar.gz
+docker/offline-tarballs/SHA256SUMS
 __pycache__/
 *.pyc
 .DS_Store

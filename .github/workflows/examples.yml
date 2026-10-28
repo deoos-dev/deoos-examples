@@ -15,7 +15,7 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -28,6 +28,10 @@ jobs:
           node-version: '22.23.2'
       - name: Install pinned deoos release
         run: ./scripts/install_deoos.sh
+      - name: Set up QEMU for the arm64 handoff
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
       - name: Start RustFS
         run: docker compose up -d rustfs
       - name: Wait for RustFS

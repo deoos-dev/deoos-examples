@@ -6,7 +6,7 @@ The engine and both clients are [deoos 0.7.2](https://github.com/deoos-dev/deoos
 
 ## Setup
 
-Docker is enough for the five crash-recovery demos. The other examples need the SDK and local [RustFS](https://github.com/rustfs/rustfs):
+Docker is enough for the crash-recovery demos. The offline approval demo builds a bundle on a connected machine, then runs with no image build. The multi-arch demo needs qemu when the host is not already the other architecture. The other examples need the SDK and local [RustFS](https://github.com/rustfs/rustfs):
 
 ```sh
 . ./scripts/prepare_local.sh
@@ -25,6 +25,10 @@ Python and TypeScript implement the same workflows, except Counting House, which
 | [Payment](python/payment/README.md) | Charge, wait for approval, fulfil; replay a saved charge after the idempotency window | `docker compose run --build --rm payment-resume` |
 | [Document index](python/document-index/README.md) | Index local text files, kill during read and during publish, search the result | `docker compose run --build --rm document-index` |
 | [Counting House](python/counting-house/README.md) | Refund saga: the model proposes, a person approves, writes are checked and compensated | `docker compose run --build --rm counting-house` |
+| [Nightly batch](python/nightly-batch-resume/README.md) | 10,000 order emails in 100 batches; kill after batch 70 and inside batch 71; a second trigger joins the same task | `docker compose run --build --rm nightly-batch-resume` |
+| [Agent run](typescript/agent-run-resume/README.md) | Saved model calls stay saved; one charge key across a timeout | `docker compose run --build --rm agent-run-resume` |
+| [Offline approval](python/offline-approval-ledger/README.md) | Air-gapped invoice approval; the signal survives a dead worker; one transfer tied to that approval | `./scripts/bundle_offline.sh` then `docker compose -f compose.offline.yaml run --rm offline-approval-ledger` |
+| [Multi-arch handoff](python/multi-arch-handoff/README.md) | Host maintenance started on one architecture and SDK, finished on the other | `python tests/multi_arch_handoff_demo.py` |
 | [Library hello](python/library/README.md) | One step, engine inside the process | `python python/library/hello.py` |
 | [Server hello](python/server/README.md) | Same greeting against `deoos-server` | see the example README |
 | [Order](python/order/README.md) | Child tasks, a timer, and an approval signal | `python python/order/order.py submit --id order-001` then `python python/order/order.py work` |
@@ -36,7 +40,7 @@ After setup, the TypeScript twins are the same arguments with `node typescript/<
 
 ## Tests
 
-`tests/` is behavioral end-to-end coverage against the real engine and RustFS. `./scripts/test.sh` runs it: HTTP integrations, payment, Counting House, document index, DEV CSV, and both Hacker News checks (the short demo and the cross-language crash matrix). GitHub Actions runs that script, then `docker compose run --build --rm counting-house`.
+`tests/` is behavioral end-to-end coverage against the real engine and RustFS. `./scripts/test.sh` runs it: HTTP integrations, payment, Counting House, document index, DEV CSV, both Hacker News checks (the short demo and the cross-language crash matrix), the nightly batch, the agent run, the air-gapped approval, and the multi-arch handoff. GitHub Actions registers qemu, runs that script, then `docker compose run --build --rm counting-house`. The approval test builds `outputs/offline-bundle.tar`, loads it, and runs `compose.offline.yaml` on an internal network. The handoff test builds the amd64 and arm64 workers.
 
 Start RustFS first (`docker compose up -d rustfs`, or the setup command above). Install with `./scripts/install_deoos.sh` and `source .deoos/env.sh` if you are not using `prepare_local.sh`.
 
@@ -72,5 +76,7 @@ Example programs are from [deoos](https://github.com/deoos-dev/deoos) commit `3c
 | `python/counting-house/refund.py` | `examples/counting_house/refund.py` |
 | `python/counting-house/demo.py` | `examples/counting_house/demo.py` |
 | `tests/counting_house.py` | `tests/counting_house.py` |
+
+The nightly batch, agent run, offline approval ledger, and multi-arch handoff were written in this repository. They are not copies of an engine-repo example.
 
 These core paths are the same workflows, wrapped by Docker rather than copied as files: `examples/hacker-news`, `examples/devto-etl`, `examples/payment-resume`, `examples/counting-house`, `examples/Dockerfile`, `examples/docker_runner.sh`, `examples/.dockerignore`, `examples/README.md`, `examples/counting_house/README.md`.

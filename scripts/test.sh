@@ -22,3 +22,9 @@ python tests/document_index_demo.py
 python tests/devto_etl_demo.py
 python tests/hacker_news_demo.py
 python tests/hacker_news.py
+python tests/nightly_batch_resume_demo.py
+python tests/agent_run_resume_demo.py
+python tests/offline_approval_ledger_demo.py
+python tests/multi_arch_handoff_demo.py
+# Drop vendored release archives so a later image build does not upload them as context.
+rm -f docker/offline-tarballs/*.tar.gz docker/offline-tarballs/SHA256SUMS
