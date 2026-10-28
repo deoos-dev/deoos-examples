@@ -27,7 +27,7 @@ Python and TypeScript implement the same workflows, except Counting House, which
 | [Counting House](python/counting-house/README.md) | Refund saga: the model proposes, a person approves, writes are checked and compensated | `docker compose run --build --rm counting-house` |
 | [Library hello](python/library/README.md) | One step, engine inside the process | `python python/library/hello.py` |
 | [Server hello](python/server/README.md) | Same greeting against `deoos-server` | see the example README |
-| [Order](python/order/README.md) | Child tasks, a timer, and an approval signal | `python python/order/order.py submit --id order-001 && python python/order/order.py work --once` |
+| [Order](python/order/README.md) | Child tasks, a timer, and an approval signal | `python python/order/order.py submit --id order-001` then `python python/order/order.py work` |
 | [HTTP integrations](python/integrations/README.md) | Webhook retry, invoice approval, scheduled page import | `python tests/use_cases.py` |
 
 After setup, the TypeScript twins are the same arguments with `node typescript/<example>/<file>.mjs`. Paths are in each example README.

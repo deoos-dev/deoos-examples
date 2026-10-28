@@ -5,8 +5,14 @@ A durable order: validate and price run as child tasks, the workflow sleeps, the
 From the repository root, after `. ./scripts/prepare_local.sh`:
 
 ```sh
-python python/order/order.py submit --id order-001 && python python/order/order.py work --once
-python python/order/order.py approve --id order-001 && python python/order/order.py work --once
+python python/order/order.py submit --id order-001
+python python/order/order.py work
 ```
 
-`inspect --id order-001` prints the saved order. `work` without `--once` polls until you stop it. `--decline` on `approve` records a rejection.
+`work` polls until you stop it. In another shell, once it is running:
+
+```sh
+python python/order/order.py approve --id order-001
+```
+
+The worker then finishes the order. `inspect --id order-001` prints it. `--decline` records a rejection. `work --once` polls a single time, which is only one step of the order.

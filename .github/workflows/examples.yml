@@ -55,6 +55,8 @@ jobs:
           mkdir -p outputs/evidence
           docker compose logs --no-color > outputs/evidence/rustfs.log 2>&1 || true
           docker compose down -v || true
+          # The Docker demo runs as root and writes private case files.
+          sudo chmod -R a+rX outputs || true
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
