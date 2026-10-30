@@ -1,5 +1,13 @@
 # Document index
 
-Same local index as `python/document-index`. JSON object keys are sorted so both languages publish the same bytes.
+Same local index as the Python example. Both languages publish the same bytes.
 
-`docker compose run --build --rm document-index` runs this file and the Python workflow, including a cross-language resume. The module is `document_index.mjs`.
+## Run
+
+```sh
+docker compose run --build --rm document-index
+```
+
+## Expected output
+
+A line per language and mode: `8 documents extracted once, publication replayed`, and the searches verified.

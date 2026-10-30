@@ -54,6 +54,31 @@ services:
     platform: linux/arm64
     image: deoos-examples:arm64
     entrypoint: [deoos-demo, multi-arch-handoff]
+  # Started by the multi-arch test after the amd64 image exists. Not part of
+  # `docker compose up -d`, which starts only RustFS.
+  deoos-server:
+    image: deoos-examples:amd64
+    platform: linux/amd64
+    pull_policy: never
+    profiles: [server]
+    init: true
+    depends_on: [rustfs]
+    entrypoint: ["/opt/deoos/bin/deoos-server"]
+    environment:
+      DEOOS_STORAGE_PROVIDER: s3
+      DEOOS_STORAGE_BUCKET: ${DEOOS_STORAGE_BUCKET:-unset}
+      AWS_ENDPOINT: http://rustfs:9000
+      AWS_ALLOW_HTTP: "true"
+      AWS_ACCESS_KEY_ID: local-development
+      AWS_SECRET_ACCESS_KEY: local-development-only-secret
+      AWS_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      EXECUTION_PREFIX: ${EXECUTION_PREFIX:-handoff}
+      LEASE_MS: ${LEASE_MS:-20000}
+      ENGINE_BIND: 0.0.0.0:7331
+      ENGINE_TOKEN: ${ENGINE_TOKEN:-unset}
+    ports:
+      - "127.0.0.1:7331:7331"
 
 volumes:
   rustfs-data:

@@ -34,7 +34,8 @@ RUN set -eu; \
       curl -fsSL --retry 3 "${base}/SHA256SUMS" -o /tmp/release/SHA256SUMS; \
     fi; \
     cd /tmp/release; \
-    awk -v name="$archive" '$2 == name { print; found++ } END { if (found != 1) exit 1 }' SHA256SUMS > selected.sha256; \
+    grep "  ${archive}$" SHA256SUMS > selected.sha256; \
+    test -s selected.sha256; \
     sha256sum -c selected.sha256; \
     tar -xzf "$archive" --strip-components=1 -C /opt/deoos; \
     python -m pip install --no-cache-dir /opt/deoos/python/*.whl duckdb==1.5.6 boto3==1.42.97; \

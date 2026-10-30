@@ -2,9 +2,9 @@
 import argparse
 import json
 import multiprocessing
+import os
 from pathlib import Path
 import time
-import urllib.request
 import uuid
 
 import boto3
@@ -12,6 +12,7 @@ import duckdb
 from botocore.exceptions import ClientError
 import paths
 from deoos import Client
+from engine_server import start_deoos_server, stop_process, wait_for_rustfs
 from hacker_news import HANDLER, HANDLERS, collect, collection_inputs
 
 STORAGE = dict(provider="s3", bucket="hacker-news-workflows", region="us-east-1",
@@ -40,7 +41,7 @@ def run_task(client, task_id, handlers):
     raise TimeoutError("Workflow did not finish within three minutes")
 
 
-def worker(storage, prefix, task_id, ready):
+def worker(url, token, task_id, ready):
     def pause_after_twenty(ctx, inputs):
         original = ctx.step
         stores = 0
@@ -59,7 +60,7 @@ def worker(storage, prefix, task_id, ready):
         ctx.step = step
         return collect(ctx, inputs)
 
-    with Client(**storage, prefix=prefix) as client:
+    with Client.remote(url, token=token) as client:
         run_task(client, task_id, {HANDLER: pause_after_twenty})
 
 
@@ -67,40 +68,38 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=DIRECTORY)
     parser.add_argument("--endpoint", default=STORAGE["endpoint"])
+    parser.add_argument("--server", type=Path, default=Path(os.environ["ENGINE_BINARY"]) if os.environ.get("ENGINE_BINARY") else None)
     args = parser.parse_args()
     directory = args.directory.resolve()
-    storage = dict(STORAGE, endpoint=args.endpoint, bucket="deoos-hn-" + uuid.uuid4().hex[:20])
+    endpoint = args.endpoint
+    bucket = "deoos-hn-" + uuid.uuid4().hex[:20]
 
-    deadline = time.monotonic() + 60
-    while True:
-        try:
-            with urllib.request.urlopen(storage["endpoint"] + "/health", timeout=2) as response:
-                if response.status == 200:
-                    break
-        except OSError:
-            pass
-        if time.monotonic() >= deadline:
-            raise TimeoutError("RustFS did not become ready on port 19000")
-        time.sleep(.5)
-    s3 = boto3.client("s3", endpoint_url=storage["endpoint"], region_name=storage["region"],
-                      aws_access_key_id=storage["access_key_id"],
-                      aws_secret_access_key=storage["secret_access_key"])
+    wait_for_rustfs(endpoint)
+    s3 = boto3.client("s3", endpoint_url=endpoint, region_name=STORAGE["region"],
+                      aws_access_key_id=STORAGE["access_key_id"],
+                      aws_secret_access_key=STORAGE["secret_access_key"])
     directory.mkdir(parents=True, exist_ok=True)
     task_id = "hn-" + uuid.uuid4().hex[:12]
     database = str(directory / f"{task_id}.duckdb")
     prefix = "hacker-news-demo/" + task_id
-    report = {"database": database, "bucket": storage["bucket"], "prefix": prefix, "passed": False, "cleaned": False}
+    report = {"database": database, "bucket": bucket, "prefix": prefix, "engine": "deoos-server",
+              "passed": False, "cleaned": False}
     evidence = directory / f"{task_id}.json"
     evidence.write_text(json.dumps(report, indent=2) + "\n")
     create_intent = False
+    server = None
+    server_log = None
     try:
         create_intent = True
-        s3.create_bucket(Bucket=storage["bucket"])
-        with Client(**storage, prefix=prefix) as client:
+        s3.create_bucket(Bucket=bucket)
+        server_log = open(directory / f"{task_id}-server.log", "w")
+        server, remote = start_deoos_server(args.server, bucket, prefix, server_log, endpoint, lease_ms=STORAGE["lease_ms"])
+        report["engine_url"] = remote["url"]
+        with Client.remote(remote["url"], token=remote["token"]) as client:
             client.submit(task_id, HANDLER, collection_inputs(database), max_attempts=5, retry_ms=200)
             context = multiprocessing.get_context("spawn")
             parent, child = context.Pipe(duplex=False)
-            process = context.Process(target=worker, args=(storage, prefix, task_id, child))
+            process = context.Process(target=worker, args=(remote["url"], remote["token"], task_id, child))
             print("Collecting 100 Hacker News items…", flush=True)
             process.start()
             child.close()
@@ -138,21 +137,24 @@ def main():
         report["error"] = repr(error)
         raise
     finally:
+        stop_process(server)
+        if server_log is not None and not server_log.closed:
+            server_log.close()
         try:
             if create_intent:
                 try:
-                    s3.head_bucket(Bucket=storage["bucket"])
+                    s3.head_bucket(Bucket=bucket)
                 except ClientError as error:
                     if error.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
                         raise
                 else:
-                    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=storage["bucket"]):
+                    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket):
                         objects = [{"Key": row["Key"]} for row in page.get("Contents", [])]
-                        if objects and s3.delete_objects(Bucket=storage["bucket"], Delete={"Objects": objects}).get("Errors"):
+                        if objects and s3.delete_objects(Bucket=bucket, Delete={"Objects": objects}).get("Errors"):
                             raise RuntimeError("Could not remove temporary workflow state")
-                    s3.delete_bucket(Bucket=storage["bucket"])
+                    s3.delete_bucket(Bucket=bucket)
                     try:
-                        s3.head_bucket(Bucket=storage["bucket"])
+                        s3.head_bucket(Bucket=bucket)
                     except ClientError as error:
                         if error.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
                             raise

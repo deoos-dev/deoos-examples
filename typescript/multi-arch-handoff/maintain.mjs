@@ -9,6 +9,12 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {GetObjectCommand, PutObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import {Client, EngineError} from 'deoos';
 
+function openClient(config) {
+  const client = config.client;
+  if (client && client.url) return Client.remote(client.url, client.token);
+  return new Client(client);
+}
+
 export const HANDLER = 'maintain.hosts.v1';
 
 function canonical(value) {
@@ -148,7 +154,7 @@ async function pause(readyPath, name) {
 }
 
 async function runWorker(config) {
-  const client = new Client(config.client);
+  const client = openClient(config);
   const deadline = Date.now() + (config.timeout_seconds ?? 300) * 1000;
   try {
     while (Date.now() < deadline) {

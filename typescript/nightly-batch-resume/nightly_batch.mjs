@@ -6,6 +6,12 @@ import {closeSync, fsyncSync, mkdirSync, openSync, readFileSync, writeFileSync} 
 import {setTimeout as delay} from 'node:timers/promises';
 import {Client, EngineError} from 'deoos';
 
+function openClient(config) {
+  const client = config.client;
+  if (client && client.url) return Client.remote(client.url, client.token);
+  return new Client(client);
+}
+
 export const HANDLER = 'nightly.batch.v1';
 const ORDER_COUNT = 10_000;
 const BATCH_SIZE = 100;
@@ -92,7 +98,7 @@ async function pause(readyPath, name) {
 }
 
 async function runWorker(config) {
-  const client = new Client(config.client);
+  const client = openClient(config);
   const deadline = Date.now() + (config.timeout_seconds ?? 300) * 1000;
   try {
     while (Date.now() < deadline) {

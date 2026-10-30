@@ -1,20 +1,21 @@
 # Hacker News
 
-Collect a fixed Hacker News snapshot into a local DuckDB file. Each story is its own checkpoint. One worker owns one database file.
+A snapshot of top stories should survive a worker that dies halfway through. Each story is its own checkpoint in a local DuckDB file, stored through `deoos-server` on RustFS.
 
-Docker is the whole setup. From the repository root:
+## Run
+
+Docker installs deoos 0.7.2 from the release archive, checks `SHA256SUMS`, starts RustFS, and runs `deoos-server`. From the repository root:
 
 ```sh
 docker compose run --build --rm hacker-news
 ```
 
-The demo collects 100 live items, kills the worker after 20 stored rows, waits out the lease, resumes, and checks that the first 20 rows were not rewritten. The database stays in `outputs/hacker-news/`. RustFS stays running.
+## Expected output
 
-To drive it yourself, after `. ./scripts/prepare_local.sh`:
-
-```sh
-python python/hacker-news/hacker_news.py submit --id hn-001 --database "$PWD/outputs/hn.duckdb" --count 20
-python python/hacker-news/hacker_news.py work --once
+```text
+Collecting 100 Hacker News items…
+Killed the worker after 20 saved items. Restarting after the lease expires…
+Completed: 100 items, no duplicate or overwritten rows.
 ```
 
-`query --database` reads the file with no engine. The cross-language crash matrix is `python tests/hacker_news.py`.
+The database stays in `outputs/hacker-news/`. The first 20 rows are not rewritten.

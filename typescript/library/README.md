@@ -1,11 +1,18 @@
 # Library hello
 
-Same greeting as `python/library`, in TypeScript. The engine runs inside Node.
+Same greeting as the Python library example, with the engine inside Node and the step stored in RustFS.
 
-From the repository root, after `. ./scripts/prepare_local.sh`:
+## Run
+
+From the repository root:
 
 ```sh
+. ./scripts/prepare_local.sh
 node typescript/library/hello.mjs
 ```
 
-Prints `Hello, World!`.
+## Expected output
+
+```text
+Hello, World!
+```

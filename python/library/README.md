@@ -1,11 +1,20 @@
 # Library hello
 
-One greeting step. The Rust engine runs inside this Python process. No server.
+You want one durable step without running a separate server. The engine runs inside the Python process and stores the step in RustFS.
 
-From the repository root, after `. ./scripts/prepare_local.sh`:
+## Run
+
+From the repository root:
 
 ```sh
+. ./scripts/prepare_local.sh
 python python/library/hello.py
 ```
 
-Prints `Hello, World!`. Pass a task id as the first argument to reuse one; otherwise each run submits a new id.
+`scripts/prepare_local.sh` installs deoos 0.7.2 from the release archive, checks `SHA256SUMS`, and starts RustFS. `pip install deoos` does not install this SDK.
+
+## Expected output
+
+```text
+Hello, World!
+```

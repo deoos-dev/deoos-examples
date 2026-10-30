@@ -7,6 +7,12 @@ import {closeSync, fsyncSync, mkdirSync, openSync, readFileSync, writeFileSync} 
 import {setTimeout as delay} from 'node:timers/promises';
 import {Client, EngineError} from 'deoos';
 
+function openClient(config) {
+  const client = config.client;
+  if (client && client.url) return Client.remote(client.url, client.token);
+  return new Client(client);
+}
+
 export const HANDLER = 'agent.run.v1';
 const STEPS = ['plan', 'research', 'draft', 'check', 'publish'];
 
@@ -94,7 +100,7 @@ async function pause(readyPath, name) {
 }
 
 async function runWorker(config) {
-  const client = new Client(config.client);
+  const client = openClient(config);
   const deadline = Date.now() + (config.timeout_seconds ?? 180) * 1000;
   try {
     while (Date.now() < deadline) {

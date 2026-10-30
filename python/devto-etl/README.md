@@ -1,13 +1,20 @@
 # DEV articles to CSV
 
-Fetch three pages of [DEV](https://dev.to) articles, normalize them, and atomically replace a CSV. Pagination overlap keeps the first copy of an article id. Array cells are JSON so Python and TypeScript write the same file.
+A CSV export should not fetch the same page again, or tear the file, when the worker dies. Three pages of DEV articles are normalized and the CSV is replaced only after the write succeeds.
 
-From the repository root:
+## Run
 
 ```sh
 docker compose run --build --rm devto-etl
 ```
 
-The demo captures the three live responses once, then replays those bytes. It kills the worker after page 2 is checkpointed, and again after the CSV write before that checkpoint commits. Each page is fetched once per workflow. Both languages and both modes (library and server) must match. Output stays in `outputs/devto-etl/`.
+The container installs deoos 0.7.2 from the checked release archive and runs the workflow against RustFS and `deoos-server`.
 
-The workflow itself is `devto_etl.py`. Replacement workers need the same output path.
+## Expected output
+
+```text
+Capturing three live DEV article pages…
+library-python: recovered from both kills; 90 rows, each page fetched once, CSV safely replaced.
+```
+
+The row count is the number of articles in the three captured pages. Each page is fetched once per workflow. Python and TypeScript, in library mode and against `deoos-server`, write the same CSV. Files stay in `outputs/devto-etl/`.

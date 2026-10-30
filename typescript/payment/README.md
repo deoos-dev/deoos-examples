@@ -1,5 +1,16 @@
 # Payment
 
-Same charge, approval, and fulfil workflow as `python/payment`. Idempotency keys are `ctx.idempotencyKey`.
+Same charge, approval, and fulfil workflow as the Python example. The idempotency key is `ctx.idempotencyKey`.
 
-`docker compose run --build --rm payment-resume` runs this file and the Python workflow. The module is `payment_resume.mjs`.
+## Run
+
+```sh
+docker compose run --build --rm payment-resume
+```
+
+## Expected output
+
+```text
+server/typescript: saved charge reused past key expiry; one charge, one fulfil.
+server/typescript: call/commit gap retried with the same key; one charge, one fulfil.
+```

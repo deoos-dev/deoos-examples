@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 import time
-import urllib.request
 import uuid
 
 import boto3
@@ -21,6 +20,8 @@ from refund import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from engine_server import server_worker_env, start_deoos_server, stop_process, wait_for_rustfs
 STORAGE = dict(provider="s3", endpoint="http://127.0.0.1:19000", allow_http=True,
                region="us-east-1", access_key_id="local-development",
                secret_access_key="local-development-only-secret", lease_ms=5000)
@@ -100,9 +101,7 @@ def spawn(directory, client_config, task_id, crash_after=None, label="worker"):
     }))
     config_path.chmod(0o600)
     log_path = directory / f"{task_id}-{label}.log"
-    env = os.environ.copy()
-    env["AWS_EC2_METADATA_DISABLED"] = "true"
-    env["PYTHONUNBUFFERED"] = "1"
+    env = server_worker_env()
     sdk = ROOT / "clients" / "python"
     if (sdk / "deoos").is_dir():
         env["PYTHONPATH"] = str(sdk) + os.pathsep + env.get("PYTHONPATH", "")
@@ -154,12 +153,13 @@ def outcome(client, task_id):
 
 def main(args):
     endpoint = args.endpoint
+    binary = getattr(args, "server", None) or os.environ.get("ENGINE_BINARY")
     run_id = uuid.uuid4().hex[:12]
     directory = Path(args.directory).resolve() / run_id
     directory.mkdir(parents=True)
     bucket = "deoos-ch-" + run_id
     report = {"bucket": bucket, "prefix": "counting-house", "endpoint": endpoint,
-              "cases": [], "cleaned": False}
+              "engine": "deoos-server", "cases": [], "cleaned": False}
     evidence = directory / "result.json"
     evidence.write_text(json.dumps(report, indent=2) + "\n")
     storage = dict(STORAGE, endpoint=endpoint, bucket=bucket, prefix="counting-house")
@@ -168,20 +168,18 @@ def main(args):
                       aws_secret_access_key=STORAGE["secret_access_key"])
     created = False
     client = None
+    server = None
+    server_log = None
     try:
-        deadline = time.monotonic() + 60
-        while True:
-            try:
-                with urllib.request.urlopen(endpoint + "/health", timeout=2) as response:
-                    if response.status == 200:
-                        break
-            except OSError:
-                pass
-            check(time.monotonic() < deadline, "object storage did not become ready")
-            time.sleep(0.5)
+        wait_for_rustfs(endpoint)
         s3.create_bucket(Bucket=bucket)
         created = True
-        client = Client(**storage)
+        server_log = open(directory / "deoos-server.log", "w")
+        server, remote = start_deoos_server(
+            binary, bucket, "counting-house", server_log, endpoint, lease_ms=STORAGE["lease_ms"])
+        report["engine_url"] = remote["url"]
+        client = Client.remote(remote["url"], token=remote["token"])
+        storage = remote
 
         def submit(task_id, office, **kwargs):
             client.submit(task_id, HANDLER, case_inputs(office, **kwargs), max_attempts=5)
@@ -340,6 +338,9 @@ def main(args):
         report["error"] = str(error)
         raise
     finally:
+        stop_process(server)
+        if server_log is not None and not server_log.closed:
+            server_log.close()
         if client is not None:
             client.close()
         if created:
