@@ -15,6 +15,13 @@ try:
 except OSError:
     sys.exit("Start RustFS first: docker compose up -d rustfs")
 PY
+echo "library hello (in-process engine, RustFS)"
+python tests/library_hello.py
+echo "server hello (deoos-server, RustFS)"
+python tests/server_hello.py
+echo "order (deoos-server, RustFS)"
+python tests/order_demo.py
+echo "HTTP integrations"
 python tests/use_cases.py
 python tests/payment_resume.py
 python tests/counting_house.py

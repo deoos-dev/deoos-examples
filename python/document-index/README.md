@@ -1,15 +1,17 @@
 # Document index
 
-Read local UTF-8 text files, checkpoint each document, and publish one searchable JSON index. Search matches lowercase ASCII words. Original text, including a BOM and CRLF, is kept.
+Indexing a folder should keep the documents already read when the worker dies, including a crash after the index is published and before that checkpoint commits. Search is lowercase ASCII words. Original text, including a BOM and CRLF, is kept.
 
-From the repository root:
+## Run
 
 ```sh
 docker compose run --build --rm document-index
 ```
 
-The demo writes eight sample files, kills the worker after four reads have committed, then kills the other language after the index is published and before that checkpoint commits. Recovery keeps the saved documents and replaces the index with the same bytes. Python and TypeScript search must agree. Files stay in `outputs/document-index/`.
+## Expected output
 
-The index path belongs to the worker host. One workflow owns one output path. This is not PDF extraction or semantic search.
+```text
+library-python: killed twice; python → typescript → python; 8 documents extracted once, publication replayed, 10 searches verified.
+```
 
-The workflow is `document_index.py`.
+Python and TypeScript search agree. The same check runs against `deoos-server`. Files stay in `outputs/document-index/`.

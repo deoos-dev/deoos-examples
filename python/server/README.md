@@ -1,17 +1,25 @@
 # Server hello
 
-Same greeting as the library example, talking to `deoos-server` over HTTP. The worker has no storage credentials.
+You want the worker to greet someone without holding storage credentials. `deoos-server` keeps the RustFS credentials. The worker only has the server URL and token.
 
-From the repository root, after `. ./scripts/prepare_local.sh`, start the server in one shell:
+## Run
+
+From the repository root, install deoos 0.7.2 (release archive and `SHA256SUMS`) and start RustFS:
 
 ```sh
+. ./scripts/prepare_local.sh
 ENGINE_BIND=127.0.0.1:7331 ENGINE_TOKEN=dev-token "$ENGINE_BINARY"
 ```
 
-In another shell that has the same setup sourced:
+Leave that server running. In another shell:
 
 ```sh
-DEOOS_MODE=server ENGINE_URL=http://127.0.0.1:7331 ENGINE_TOKEN=dev-token python python/server/hello.py
+. ./.deoos/env.sh
+ENGINE_URL=http://127.0.0.1:7331 ENGINE_TOKEN=dev-token python python/server/hello.py
 ```
 
-Prints `Hello, World!`.
+## Expected output
+
+```text
+Hello, World!
+```

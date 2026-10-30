@@ -1,5 +1,17 @@
 # DEV articles to CSV
 
-Same CSV workflow as `python/devto-etl`. The Docker command runs both languages.
+Same CSV export as the Python example. The Docker command runs both languages.
 
-`devto_etl.mjs` exports `etl` and `HANDLERS`. The recovery check imports it from `tests/devto_etl_demo.py`.
+## Run
+
+```sh
+docker compose run --build --rm devto-etl
+```
+
+## Expected output
+
+```text
+server-typescript: recovered from both kills; 90 rows, each page fetched once, CSV safely replaced.
+```
+
+The row count is the number of articles in the three captured pages.

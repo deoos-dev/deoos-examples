@@ -49,7 +49,7 @@ jobs:
           else:
               raise SystemExit('RustFS did not become ready')
           PY
-      - name: Behavioral end-to-end tests
+      - name: Every example against RustFS and deoos-server
         run: ./scripts/test.sh
       - name: Counting House via the documented Docker command
         run: docker compose run --build --rm counting-house

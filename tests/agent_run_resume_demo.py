@@ -8,7 +8,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 import uuid
 from pathlib import Path
 
@@ -18,17 +17,12 @@ from botocore.exceptions import ClientError
 os.environ["AWS_EC2_METADATA_DISABLED"] = "true"
 import paths
 from agent_run import HANDLER
+from engine_server import server_worker_env, start_deoos_server, stop_process, wait_for_rustfs
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = ROOT / "python" / "agent-run-resume" / "agent_run.py"
 TS = ROOT / "typescript" / "agent-run-resume" / "agent_run.mjs"
 TOKENS = {"plan": 120, "research": 340, "draft": 560, "check": 80, "publish": 40}
-
-
-def storage(endpoint, bucket, prefix):
-    return dict(provider="s3", endpoint=endpoint, allow_http=True, region="us-east-1",
-                access_key_id="local-development", secret_access_key="local-development-only-secret",
-                bucket=bucket, prefix=prefix, lease_ms=5_000)
 
 
 def check(condition, message):
@@ -162,26 +156,22 @@ def main(args):
     languages = ("typescript", "python") if args.node_sdk else ("python",)
     s3 = boto3.client("s3", endpoint_url=endpoint, region_name="us-east-1",
                       aws_access_key_id="local-development", aws_secret_access_key="local-development-only-secret")
-    deadline = time.monotonic() + 60
-    while True:
-        try:
-            with urllib.request.urlopen(endpoint + "/health", timeout=2) as response:
-                if response.status == 200:
-                    break
-        except OSError:
-            pass
-        check(time.monotonic() < deadline, "object storage did not become ready")
-        time.sleep(0.5)
+    wait_for_rustfs(endpoint)
+    binary = args.server or os.environ.get("ENGINE_BINARY")
 
     for language in languages:
         bucket = f"deoos-agent-{run}-{language[:2]}"
         service = AgentService()
         client = None
+        server = None
+        server_log = None
         workers = []
         try:
             s3.create_bucket(Bucket=bucket)
             from deoos import Client
-            client = Client(**storage(endpoint, bucket, "agent"))
+            server_log = open(directory / f"{language}-server.log", "w")
+            server, remote = start_deoos_server(binary, bucket, "agent", server_log, endpoint, lease_ms=5_000)
+            client = Client.remote(remote["url"], token=remote["token"])
             task_id = "agent-run-001"
             inputs = {"amount_cents": 100, "service_url": service.url}
             client.submit(task_id, HANDLER, inputs, max_attempts=5, retry_ms=0)
@@ -190,7 +180,7 @@ def main(args):
                 ready = directory / f"{language}-{label}-ready"
                 config_path = directory / f"{language}-{label}.json"
                 config_path.write_text(json.dumps({
-                    "client": storage(endpoint, bucket, "agent"),
+                    "client": remote,
                     "pause_after": pause_after,
                     "ready_path": str(ready),
                     "task_id": task_id,
@@ -200,7 +190,7 @@ def main(args):
                 log_path = directory / f"{language}-{label}.log"
                 log = open(log_path, "w")
                 command = [sys.executable, str(PY), "work", "--config", str(config_path)] if language == "python" else ["node", str(TS), "work", "--config", str(config_path)]
-                process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "PYTHONUNBUFFERED": "1"})
+                process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=server_worker_env())
                 workers.append((process, log))
                 return process, log_path, ready
 
@@ -247,6 +237,9 @@ def main(args):
                 if not log.closed:
                     log.close()
             service.close()
+            stop_process(server)
+            if server_log is not None and not server_log.closed:
+                server_log.close()
             if client is not None:
                 client.close()
             try:
@@ -267,6 +260,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=ROOT / "outputs" / "agent-run-resume")
     parser.add_argument("--endpoint", default=os.environ.get("DEOOS_ENDPOINT", "http://127.0.0.1:19000"))
-    parser.add_argument("--server", type=Path, default=None)
+    parser.add_argument("--server", type=Path, default=Path(os.environ["ENGINE_BINARY"]) if os.environ.get("ENGINE_BINARY") else None)
     parser.add_argument("--node-sdk", type=Path, default=Path(os.environ["DEOOS_NODE_SDK"]) if os.environ.get("DEOOS_NODE_SDK") else None)
     main(parser.parse_args())

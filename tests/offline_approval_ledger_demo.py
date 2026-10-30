@@ -19,6 +19,7 @@ from pathlib import Path
 
 os.environ["AWS_EC2_METADATA_DISABLED"] = "true"
 import paths
+from engine_server import server_worker_env, start_deoos_server, stop_process, wait_for_rustfs
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = ROOT / "python" / "offline-approval-ledger" / "approval_ledger.py"
@@ -135,12 +136,6 @@ class Bank:
         self.thread.join(timeout=5)
 
 
-def storage(endpoint, bucket):
-    return dict(provider="s3", endpoint=endpoint, allow_http=True, region="us-east-1",
-                access_key_id="local-development", secret_access_key="local-development-only-secret",
-                bucket=bucket, prefix="approval", lease_ms=5_000)
-
-
 def run_isolated(args):
     from approval_ledger import HANDLER
     from deoos import Client
@@ -180,22 +175,20 @@ def run_isolated(args):
     }
     bank = Bank()
     client = None
+    server = None
+    server_log = None
     workers = []
     s3 = boto3.client("s3", endpoint_url=endpoint, region_name="us-east-1",
                       aws_access_key_id="local-development", aws_secret_access_key="local-development-only-secret")
     try:
-        deadline = time.monotonic() + 60
-        while True:
-            try:
-                with urllib.request.urlopen(endpoint + "/health", timeout=2) as response:
-                    if response.status == 200:
-                        break
-            except OSError:
-                pass
-            check(time.monotonic() < deadline, "object storage did not become ready")
-            time.sleep(0.5)
+        wait_for_rustfs(endpoint)
         s3.create_bucket(Bucket=bucket)
-        client = Client(**storage(endpoint, bucket))
+        server_log = open(work / "deoos-server.log", "w")
+        server, remote = start_deoos_server(
+            os.environ.get("ENGINE_BINARY"), bucket, "approval", server_log, endpoint, lease_ms=5_000)
+        report["engine"] = "deoos-server"
+        report["engine_url"] = remote["url"]
+        client = Client.remote(remote["url"], token=remote["token"])
         task_id = "approval-inv-100"
         inputs = {"bank_url": bank.url, "counter_dir": str(counter_dir), "invoice_path": INVOICE}
         client.submit(task_id, HANDLER, inputs, max_attempts=5, retry_ms=0)
@@ -204,7 +197,7 @@ def run_isolated(args):
             ready = work / f"{label}-ready"
             config_path = work / f"{label}.json"
             config_path.write_text(json.dumps({
-                "client": storage(endpoint, bucket),
+                "client": remote,
                 "pause_inside": pause_inside,
                 "ready_path": str(ready),
                 "task_id": task_id,
@@ -215,7 +208,7 @@ def run_isolated(args):
             log = open(log_path, "w")
             process = subprocess.Popen(
                 [sys.executable, str(PY), "work", "--config", str(config_path)],
-                stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "PYTHONUNBUFFERED": "1"})
+                stdout=log, stderr=subprocess.STDOUT, env=server_worker_env())
             workers.append((process, log))
             return process, log_path, ready
 
@@ -271,6 +264,9 @@ def run_isolated(args):
             if not log.closed:
                 log.close()
         bank.close()
+        stop_process(server)
+        if server_log is not None and not server_log.closed:
+            server_log.close()
         if client is not None:
             client.close()
         try:

@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError
 
 os.environ["AWS_EC2_METADATA_DISABLED"] = "true"
 import paths
+from engine_server import wait_for_url
 from maintain import HANDLER, STEPS, canonical_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,16 +53,34 @@ def stop_container(name, process):
 
 
 def ensure_qemu():
-    if Path("/proc/sys/fs/binfmt_misc/qemu-aarch64").exists():
+    binfmt = Path("/proc/sys/fs/binfmt_misc")
+    if not (binfmt / "status").exists():
+        subprocess.run(["mount", "-t", "binfmt_misc", "binfmt_misc", str(binfmt)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not (binfmt / "status").exists():
+            subprocess.run(["sudo", "-n", "mount", "-t", "binfmt_misc", "binfmt_misc", str(binfmt)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if (binfmt / "qemu-aarch64").exists():
         return
     subprocess.check_call(["docker", "run", "--privileged", "--rm", "tonistiigi/binfmt", "--install", "arm64"])
-    check(Path("/proc/sys/fs/binfmt_misc/qemu-aarch64").exists(), "qemu-aarch64 was not registered")
+    check((binfmt / "qemu-aarch64").exists(), "qemu-aarch64 was not registered")
 
 
-def storage(endpoint, bucket):
-    return dict(provider="s3", endpoint=endpoint, allow_http=True, region="us-east-1",
-                access_key_id="local-development", secret_access_key="local-development-only-secret",
-                bucket=bucket, prefix="handoff", lease_ms=20_000)
+def start_arch_server(bucket, token):
+    env = dict(os.environ)
+    env.update(DEOOS_STORAGE_BUCKET=bucket, EXECUTION_PREFIX="handoff", ENGINE_TOKEN=token, LEASE_MS="20000")
+    subprocess.run(["docker", "compose", "--profile", "server", "rm", "-sf", "deoos-server"],
+                   cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.check_call(
+        ["docker", "compose", "--profile", "server", "up", "-d", "--no-build", "deoos-server"],
+        cwd=ROOT, env=env)
+    wait_for_url("http://127.0.0.1:7331/health", timeout=60, headers={"Authorization": "Bearer " + token})
+    return {"url": "http://deoos-server:7331", "token": token}
+
+
+def stop_arch_server():
+    subprocess.run(["docker", "compose", "--profile", "server", "rm", "-sf", "deoos-server"],
+                   cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def s3_client(endpoint):
@@ -103,30 +122,33 @@ def main(args):
     def run_case(name, phases):
         bucket = f"deoos-arch-{run}-{name}"[:63]
         s3.create_bucket(Bucket=bucket)
-        host = Client(**storage(endpoint, bucket))
-        task_id = "maintain-hosts"
-        case_dir = directory / name
-        counter_dir = case_dir / "counters"
-        counter_in_container = "/app/" + str(counter_dir.relative_to(ROOT)).replace("\\", "/")
-        inputs = {
-            "access_key_id": "local-development",
-            "backup_key": "backup/inventory.json",
-            "bucket": bucket,
-            "counter_dir": counter_in_container,
-            "endpoint": "http://rustfs:9000",
-            "inventory_path": "/app/python/multi-arch-handoff/inventory.json",
-            "secret_access_key": "local-development-only-secret",
-        }
-        host.submit(task_id, HANDLER, inputs, max_attempts=5, retry_ms=0)
+        token = uuid.uuid4().hex
+        host = None
         processes = []
         try:
+            remote = start_arch_server(bucket, token)
+            host = Client.remote("http://127.0.0.1:7331", token=token)
+            task_id = "maintain-hosts"
+            case_dir = directory / name
+            counter_dir = case_dir / "counters"
+            counter_in_container = "/app/" + str(counter_dir.relative_to(ROOT)).replace("\\", "/")
+            inputs = {
+                "access_key_id": "local-development",
+                "backup_key": "backup/inventory.json",
+                "bucket": bucket,
+                "counter_dir": counter_in_container,
+                "endpoint": "http://rustfs:9000",
+                "inventory_path": "/app/python/multi-arch-handoff/inventory.json",
+                "secret_access_key": "local-development-only-secret",
+            }
+            host.submit(task_id, HANDLER, inputs, max_attempts=5, retry_ms=0)
             for index, (service, sdk, pause_after) in enumerate(phases):
                 container = f"handoff-{name}-{index}"
                 ready_host = case_dir / f"phase-{index}-ready"
                 config_host = case_dir / f"phase-{index}.json"
                 config_host.parent.mkdir(parents=True, exist_ok=True)
                 config_host.write_text(json.dumps({
-                    "client": storage("http://rustfs:9000", bucket),
+                    "client": remote,
                     "pause_after": pause_after,
                     "ready_path": "/app/" + str(ready_host.relative_to(ROOT)).replace("\\", "/"),
                     "task_id": task_id,
@@ -170,7 +192,9 @@ def main(args):
                     stop_container(container, process)
                 if not log.closed:
                     log.close()
-            host.close()
+            if host is not None:
+                host.close()
+            stop_arch_server()
             try:
                 s3.head_bucket(Bucket=bucket)
             except ClientError:
