@@ -9,7 +9,7 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Keep this pin identical to deoos.lock.
-ARG DEOOS_VERSION=0.7.2
+ARG DEOOS_VERSION=0.8.0
 ARG TARGETARCH
 # Set to a filename in docker/offline-tarballs/ to build without downloading deoos.
 # Leave it empty and the build uses that directory's matching archive when present.

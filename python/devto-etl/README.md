@@ -8,7 +8,7 @@ A CSV export should not fetch the same page again, or tear the file, when the wo
 docker compose run --build --rm devto-etl
 ```
 
-The container installs deoos 0.7.2 from the checked release archive and runs the workflow against RustFS and `deoos-server`.
+The container installs deoos 0.8.0 from the checked release archive and runs the workflow against RustFS and `deoos-server`.
 
 ## Expected output
 

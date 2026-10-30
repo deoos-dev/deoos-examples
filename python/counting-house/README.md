@@ -10,7 +10,7 @@ Avery Chen was charged 4200 cents on invoice `inv-42`. The systems are JSON file
 docker compose run --build --rm counting-house
 ```
 
-The container installs deoos 0.7.2 from the checked release archive and runs the saga on RustFS and `deoos-server`.
+The container installs deoos 0.8.0 from the checked release archive and runs the saga on RustFS and `deoos-server`.
 
 ## Expected output
 

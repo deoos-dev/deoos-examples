@@ -10,7 +10,7 @@ docker compose up -d rustfs
 python tests/use_cases.py
 ```
 
-`prepare_local.sh` installs the 0.7.2 archive after `SHA256SUMS`. To drive one case yourself, in another terminal:
+`prepare_local.sh` installs the 0.8.0 archive after `SHA256SUMS`. To drive one case yourself, in another terminal:
 
 ```sh
 python tests/use_cases.py --serve --port 18080

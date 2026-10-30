@@ -1,7 +1,7 @@
 """Real HN snapshot, cross-SDK crashes, commit-gap replay, schedules, offline SQL.
 
-Run with a Python environment containing deoos 0.7, duckdb and boto3. The Node
-example must resolve deoos 0.7 and @duckdb/node-api. Only local RustFS is used.
+Run with a Python environment containing deoos 0.8.0, duckdb and boto3. The Node
+example must resolve deoos 0.8.0 and @duckdb/node-api. Only local RustFS is used.
 The first public API responses are cached unchanged for the remaining cells;
 evidence distinguishes upstream requests from replay, rather than calling all
 four cells independent live-source runs.
