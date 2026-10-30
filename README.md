@@ -1,8 +1,8 @@
 # deoos examples
 
-Runnable examples for [deoos](https://github.com/deoos-dev/deoos) 0.7.2. The Python and Node SDKs are not on PyPI or npm. `pip install deoos` and `npm install deoos` do not install this project.
+Runnable examples for [deoos](https://github.com/deoos-dev/deoos) 0.8.0. The Python and Node SDKs are not on PyPI or npm. `pip install deoos` and `npm install deoos` do not install this project.
 
-`scripts/install_deoos.sh` follows the install in the [deoos README](https://github.com/deoos-dev/deoos#install): download the release archive for this machine, check `SHA256SUMS`, then install that wheel, that Node tarball, and `deoos-server`. The Docker image does the same check. `deoos.lock` pins version `0.7.2`, git `457efe57737c7ed5fefb3ea9dcf99869c11760a6`.
+`scripts/install_deoos.sh` follows the install in the [deoos README](https://github.com/deoos-dev/deoos#install): download the release archive for this machine, check `SHA256SUMS`, then install that wheel, that Node tarball, and `deoos-server`. The Docker image does the same check. `deoos.lock` pins version `0.8.0`, git `6368fb380d422724ad1db40267abeebc68c94db0`.
 
 Each example runs on real RustFS and the published `deoos-server`. Library hello is the exception: the same engine runs inside the process and still stores the step in RustFS. Nothing here mocks the engine. External HTTP targets in the payment, mail, agent, and integration demos are local stand-ins so the tests can crash a call on purpose.
 

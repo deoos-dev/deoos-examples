@@ -1,5 +1,5 @@
 #!/bin/sh
-# On a connected machine: verify the pinned deoos 0.7.2 Linux archives, pull the
+# On a connected machine: verify the pinned deoos 0.8.0 Linux archives, pull the
 # pinned RustFS image, build deoos-examples:offline from the local tarball, and
 # save both images to outputs/offline-bundle.tar.
 set -eu

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install deoos the way the deoos README describes for release 0.7.2.
+# Install deoos the way the deoos README describes for release 0.8.0.
 # The SDKs are not on PyPI or npm. pip install deoos and npm install deoos
 # do not install this project. This script downloads the archive for this
 # machine, checks SHA256SUMS, then installs that wheel, that Node tarball,

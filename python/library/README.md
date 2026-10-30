@@ -11,7 +11,7 @@ From the repository root:
 python python/library/hello.py
 ```
 
-`scripts/prepare_local.sh` installs deoos 0.7.2 from the release archive, checks `SHA256SUMS`, and starts RustFS. `pip install deoos` does not install this SDK.
+`scripts/prepare_local.sh` installs deoos 0.8.0 from the release archive, checks `SHA256SUMS`, and starts RustFS. `pip install deoos` does not install this SDK.
 
 ## Expected output
 

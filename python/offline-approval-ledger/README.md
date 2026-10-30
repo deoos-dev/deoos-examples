@@ -12,7 +12,7 @@ On a connected machine, from the repository root:
 ./scripts/bundle_offline.sh
 ```
 
-That downloads the deoos 0.7.2 Linux archives, checks `SHA256SUMS`, pulls the pinned RustFS image, builds `deoos-examples:offline` from the local archive, and writes `outputs/offline-bundle.tar`.
+That downloads the deoos 0.8.0 Linux archives, checks `SHA256SUMS`, pulls the pinned RustFS image, builds `deoos-examples:offline` from the local archive, and writes `outputs/offline-bundle.tar`.
 
 On the isolated host:
 
